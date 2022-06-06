@@ -143,6 +143,65 @@ class standard_api():
         self.insert_case_result(result_infor)
         return result_infor
 
+    # api请求入口
+    def sigle_case_test(self, test_case_list):
+        '''
+        单条用例测试
+        '''
+        # 定义返回的数据格式
+        result_infor = {'code': 200, 'message': 'success', 'result_list': []}
+        # 获取环境变量
+        env_config_list = db_manager_instances.get_env_setting('test')
+        # 判断环境变量是否为空，为空则返回
+        if len(env_config_list) == 0:
+            result_infor['code'] = 401
+            result_infor['message'] = '环境变量为空'
+            return result_infor
+        # 从数据库中获取需要执行的用例
+        test_case_list = '(' + ','.join('%s' % id for id in test_case_list) + ')'
+        param = [
+                {'field_name': 'id', 'filed_concatenation': 'in', 'field_value': test_case_list},
+            ]
+        case_list = db_manager_instances.get_table_data_sigle(config.test_case_db, 'stand_atom_case_list', 'id', param)
+        # 判断用例变量是否为空，为空则返回
+        if len(test_case_list) == 0 or len(test_case_list) > 10:
+            result_infor['code'] = 401
+            result_infor['message'] = '用例列表为空,或是用例数据大于10条'
+            return result_infor
+        # 进行请求头重新赋值
+        basic_headers['Authorization'] = 'Bearer ' + utils_instances.update_user_token(env_config_list[0]['env_host'])
+        # 根据test_case_list、url_list 重组测试用例，主要是更新request_url
+        case_list = self.test_case_optimize(case_list, env_config_list[0])
+        # 循环检查case步骤，判断走什么类型的测试
+        for test_case in case_list:
+            test_result_infor = self.standard_case_excute(test_case, env_config_list)
+            result_infor['result_list'].append(test_result_infor)
+            continue
+        print(result_infor)
+        # 调用数据库更新操作，更新当前用例状态
+        self.update_case_status('stand_atom_case_list',result_infor)
+        return result_infor
+
+    #更新用例的可执行状态
+    def update_case_status(self,table_name,result_infor):
+        '''
+        从用例结果中获取基础的结果信息，写入到用例列表
+        '''
+        # 获取接口case执行的结果
+        if_case_result_list = result_infor['result_list']
+        for case_result in if_case_result_list:
+            case_id = int(usefulTools_instances.SubString_handle(case_result['case_id'], '当前测试用例id：', ''))
+            # excute_result = '\'' + case_result['test_result'] + '\''
+            # excute_result = usefulTools_instances.quoted_string(case_result['test_result'])
+            update_field = ['case_status']
+            update_value = [case_result['test_result']]
+            query_field = ['id']
+            query_value = [case_id]
+            update_value = usefulTools_instances.quoted_string(update_value)
+            db_manager_instances.update_data_db(config.test_case_db,table_name,update_field, update_value, query_field, query_value)
+
+
+
     #把结果插入到数据库中
     def insert_case_result(self,result_infor):
         #先从 fun_case_result 中获取最新的 batch_id
