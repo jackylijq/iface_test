@@ -1,7 +1,7 @@
 """
     主要用来做用例执行的工作，分为2种执行，一种为直接界面测试，不进行结果写入，一种为写入结果
 """
-import json,requests,time
+import json,requests,time,config
 from flask import Blueprint, g
 from flask import jsonify
 # from lin import route_meta, group_required, login_required
@@ -122,16 +122,25 @@ def update_project():
         result['message'] = u'添加失败，原因：%s' %reason
         return result
 
-@interface.route('/project/list/', methods=['GET'])
+@interface.route('/project/list', methods=['POST'])
 def project_list():
     result = {'code': 200, 'message': '获取产品列表成功', 'data': {'curPage': 0, 'pageSize': 0, 'total': 0, 'datasList': []}}
     #获取get参数
-    plineid = request.args.get('plineid',type = int,default = 0)
+    # plineid = request.args.get('plineid',type = int,default = 0)
+    plineid = 0
     try:
-        param = [
-            {'field_name': 'project_line_id', 'filed_concatenation': '=', 'field_value': plineid},
-        ]
-        data_list = db_manager_instances.get_table_data_sigle('lin_cms','project','id',param)
+        post_data = json.loads(request.data)
+        plineid = post_data['project_line_id']
+    except Exception as reason:
+        print(reason)
+    param = []
+    if plineid > 0:
+        param.append({'field_name': 'project_line_id', 'filed_concatenation': '=', 'field_value': plineid})
+    try:
+        # param = [
+        #     {'field_name': 'project_line_id', 'filed_concatenation': '=', 'field_value': plineid},
+        # ]
+        data_list = db_manager_instances.get_table_data_sigle(config.test_case_db,'project_list','id',param)
         result['data']['datasList'] = data_list
         result['total'] = len(data_list)
         return result
@@ -188,8 +197,16 @@ def group_list():
     result = {'code': 200, 'message': '获取分组列表成功', 'data': {'curPage': 0, 'pageSize': 0, 'total': 0, 'datasList': []}}
     #获取get请求参数
     # pid = request.args.get('pid',type = int,default = 0)
-    post_data = json.loads(request.data)
-    param_list = ['pid']
+    # 从接口获取数据
+    post_data = {}
+    try:
+        post_data = json.loads(request.data)
+    except Exception as reason:
+        result['code'] = 401
+        result['data'] = {}
+        result['message'] = u'传入参数非json格式，无法解析'
+        return result
+    param_list = ['project_id']
     param_check_result = usefulTools_instances.check_param_exist(param_list,post_data)
     if len(param_check_result) > 0:
         result['code'] = 401
@@ -197,9 +214,9 @@ def group_list():
         return result
     try:
         param = [
-            {'field_name': 'project_id', 'filed_concatenation': '=', 'field_value': post_data['pid']},
+            {'field_name': 'project_id', 'filed_concatenation': '=', 'field_value': post_data['project_id']},
         ]
-        data_list = db_manager_instances.query_date_page('lin_cms', 'interface_group', 'id', param)
+        data_list = db_manager_instances.query_date_page(config.test_case_db, 'iface_group', 'id', param)
         result['data']['datasList'] = data_list
         result['total'] = len(data_list)
         return result
@@ -276,21 +293,34 @@ def update_interface():
         result['message'] = u'更新接口信息失败，原因：%s' %reason
         return result
 
-@interface.route('/iface/list', methods=['GET'])
+@interface.route('/iface/list', methods=['POST'])
 def iface_list():
     result = {'code': 200, 'message': '获取分组列表成功', 'data': {'curPage': 0, 'pageSize': 0, 'total': 0, 'datasList': []}}
     #获取参数：
-    project_id =  request.args.get("project_id",type = int,default = 0)
-    group_id =  request.args.get("group_id",type = int,default = 0)
+    # project_id =  request.args.get("project_id",type = int,default = 0)
+    # group_id =  request.args.get("group_id",type = int,default = 0)
+    # 从接口获取数据
+    post_data = {}
+    pid = 0
+    group_id = 0
+    try:
+        post_data = json.loads(request.data)
+        pid = post_data['project_id']
+        group_id = post_data['group_id']
+    except Exception as reason:
+        result['code'] = 401
+        result['data'] = {}
+        result['message'] = u'传入参数非json格式，无法解析'
+        return result
     try:
         param = []
-        if project_id != 0:
-            param_add = {'field_name': 'project_id', 'filed_concatenation': '=', 'field_value': project_id}
+        if pid != 0:
+            param_add = {'field_name': 'project_id', 'filed_concatenation': '=', 'field_value': post_data['project_id']}
             param.append(param_add)
         if group_id != 0:
-            param_add = {'field_name': 'group_id', 'filed_concatenation': '=', 'field_value': group_id}
+            param_add = {'field_name': 'group_id', 'filed_concatenation': '=', 'field_value': post_data['group_id']}
             param.append(param_add)
-        data_list = db_manager_instances.get_table_data_sigle('lin_cms', 'interface_list', 'id', param)
+        data_list = db_manager_instances.get_table_data_sigle(config.test_case_db, 'iface_list', 'id', param)
         for i in range(len(data_list)):
             data_list[i].pop('res_body')
             data_list[i].pop('req_body')
