@@ -403,7 +403,7 @@ class database_operate():
         query_field = ['id']
         query_value = [case_id]
         # 进行接口数据更新
-        update_field = ['project_id', 'iface_name', 'request_method', 'request_url', 'req_body','res_body']
+        update_field = ['project_id','group_id', 'iface_name', 'request_method', 'request_url', 'req_body','res_body']
         update_value = []
         # 获取接口列表
         param = [
@@ -484,6 +484,21 @@ class database_operate():
         # print(basic_sql % basic_param)
         # 进行数据库操作
         update_id = utils_database.update_database(basic_sql % basic_param,config_db_name)
+        return update_id
+
+    #数据删除
+    def del_data_db(self, config_db_name, table_name, query_field, query_value):
+        '''
+        根据一定的条件从数据库中进行数据删除
+        '''
+        basic_sql = 'DELETE FROM %(table_name)s t where '
+        basic_param = {'table_name': table_name}
+        # 更新查询字段
+        for j in range(len(query_field)):
+            sql_last = ' and ' if j < len(query_field) - 1 else ''
+            basic_sql = basic_sql + str(query_field[j]) + '=' + str(usefulTools_instances.quoted_string(query_value[j])) + sql_last
+        # 进行数据库操作
+        update_id = utils_database.update_database(basic_sql % basic_param, config_db_name)
         return update_id
 
     #根据传入的参数组装更新列表
