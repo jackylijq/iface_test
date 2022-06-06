@@ -3,13 +3,9 @@
 """
 import json,requests,config
 from flask import Blueprint, g
-from flask import jsonify
-# from lin import route_meta, group_required, login_required
-from lin.exception import Success
-from lin.redprint import Redprint
-# from app.models.book import Book
-# from app.validators.forms import BookSearchForm, CreateOrUpdateBookForm
 from flask import Flask,request
+from concurrent.futures import ThreadPoolExecutor
+
 from tools import usefulTools,db_manager
 from base_frame import standard_api_request
 
@@ -19,6 +15,7 @@ testcase_api = Blueprint("case", __name__)
 standard_api_instances = standard_api_request.standard_api()
 usefulTools_instances = usefulTools.userfulToolsFactory()
 db_manager_instances = db_manager.database_operate()
+executor = ThreadPoolExecutor(1)
 
 @testcase_api.route('/execute/sigle', methods=['GET'])
 def execute_sigle():
@@ -43,6 +40,35 @@ def execute_sigle():
     test_result = standard_api_instances.api_request_entry(post_data)
     return test_result
 
+@testcase_api.route('/execute/test', methods=['GET'])
+def execute_test():
+    # 定义默认结果：
+    result = {'code': 200, 'message': '测试已开始，刷新页面查看结果', 'data': []}
+    #定义传入的参数
+    # 获取接口传入的内容
+    post_data = json.loads(request.data)
+    # 定义参数检测
+    case_key_list = ['test_case']
+    args_key_list = post_data.keys()
+    for i in range(len(case_key_list)):
+        if case_key_list[i] in args_key_list:
+            continue
+        result['message'] = u'请求参数中缺少字段：%s' % case_key_list[i]
+        return result
+    test_case_list = post_data['test_case']
+    if len(test_case_list) == 0:
+        result['message'] = u'所有参数都为空，无需要执行的用例'
+        return result
+    # test_result = standard_api_instances.api_request_entry(post_data)
+    case_list = post_data['test_case']
+    try:
+        executor.submit(standard_api_instances.sigle_case_test, case_list)
+        return result
+    except Exception as reason:
+        result['code'] = 401
+        result['message'] = '服务器异常'
+        return result
+
 
 @testcase_api.route('/standStom/add', methods=['POST'])
 def add_stand_stom_case():
@@ -56,7 +82,7 @@ def add_stand_stom_case():
         result['message'] = u'传入参数非json格式，无法解析'
         return result
     #必填参数校验
-    param_list = ['iface_id','case_title','case_desc','case_type','header','request_param','response','result_check_sql']
+    param_list = ['iface_id','case_title','case_desc','case_type','header','request_param','response']
     param_check_result = usefulTools_instances.check_param_exist(param_list, post_data)
     if len(param_check_result) > 0:
         result['code'] = 401
@@ -64,7 +90,7 @@ def add_stand_stom_case():
         return result
     #根据project需要的内容进行更新
     try:
-        insert_id = db_manager_instances.insert_data_byField('case_db','stand_atom_case_list',post_data)
+        insert_id = db_manager_instances.insert_data_byField(config.test_case_db,'stand_atom_case_list',post_data)
         result['data']['id'] = insert_id
         db_manager_instances.case_iface_update(insert_id,post_data['iface_id'])
         return result
@@ -113,6 +139,37 @@ def update_standStom_case():
         result['code'] = 401
         return result
 
+@testcase_api.route('/standStom/del', methods=['POST'])
+def del_standStom_case():
+    result = {'code': 200, 'message': '删除用例成功', 'data': {}}
+    # 从接口获取数据
+    try:
+        post_data = json.loads(request.data)
+    except Exception as reason:
+        result['code'] = 401
+        result['data'] = {}
+        result['message'] = u'传入参数非json格式，无法解析'
+        return result
+    # 必填参数校验
+    param_list = ['id']
+    param_check_result = usefulTools_instances.check_param_exist(param_list, post_data)
+    if len(param_check_result) > 0:
+        result['code'] = 401
+        result['message'] = u'必填参数：%s 为空' % param_check_result
+        return result
+    # 根据project需要的内容进行更新
+    case_id = post_data['id']
+    # 定义查询数据,更新数据
+    query_field = ['id']
+    query_value = [case_id]
+    try:
+        db_manager_instances.del_data_db(config.test_case_db, 'stand_atom_case_list',query_field, query_value)
+        return result
+    except Exception as reason:
+        result['message'] = u'删除失败，原因：%s' % reason
+        result['code'] = 401
+        return result
+
 @testcase_api.route('/build/copy', methods=['POST'])
 def copy_testcase():
     result = {'code': 200, 'message': '添加用例信息成功', 'data': []}
@@ -134,6 +191,10 @@ def copy_testcase():
 
 @testcase_api.route('/standStom/list', methods=['POST'])
 def get_standStom_case_list():
+    '''
+    支持的参数：project_id，iface_id,
+    '''
+    #定义默认的返回内容
     result = {'code': 200, 'message': '获取用例列表成功', 'data': {'pageSize':0,'curPage':0,'total':0,'datasList':[]}}
     try:
         post_data = json.loads(request.data)
@@ -151,9 +212,9 @@ def get_standStom_case_list():
         return result
     try:
         param = usefulTools_instances.create_query_condition(post_data)
-        data_list = db_manager_instances.query_date_page('lin_cms','stand_atom_case_list','id',param,post_data['curPage'],post_data['pageSize'])
+        data_list = db_manager_instances.query_date_single(config.test_case_db,'stand_atom_case_list','id',param,post_data['curPage'],post_data['pageSize'])
         result['data']['datasList'] = data_list
-        result['data']['total'] = db_manager_instances.get_total_size('lin_cms','stand_atom_case_list','id',param)
+        result['data']['total'] = db_manager_instances.get_total_size(config.test_case_db,'stand_atom_case_list','id',param)
         result['data']['curPage'] = post_data['curPage']
         result['data']['pageSize'] = post_data['pageSize']
         return result
