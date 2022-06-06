@@ -64,7 +64,7 @@ class utils_components():
             if json_data_keys[i] not in check_list:
                 continue
             #如果当前key的值为none，则跳过
-            if check_data[json_data_keys[i]] == None:
+            if check_data[json_data_keys[i]] == None or check_data[json_data_keys[i]] =='':
                 continue
             if type(check_data[json_data_keys[i]]) == type({}):
                 continue

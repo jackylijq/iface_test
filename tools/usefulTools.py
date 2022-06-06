@@ -455,7 +455,8 @@ class userfulToolsFactory():
         for i in range(len(param_json_kyes)):
             if param_json_kyes[i] in ['curPage','pageSize']:
                 continue
-            if 'title' in param_json_kyes[i] or 'desc' in param_json_kyes[i] or 'Tag' in param_json_kyes[i]:
+            # if 'title' in param_json_kyes[i] or 'desc' in param_json_kyes[i] or 'Tag' in param_json_kyes[i]:
+            if param_json_kyes[i] in ['case_title','iface_name','case_desc','iface_desc']:
                 condition = '&&' + param_json[param_json_kyes[i]] + '&&'
                 query_infor = {'field_name': param_json_kyes[i], 'filed_concatenation': 'LIKE','field_value': condition}
                 query_condition.append(copy.deepcopy(query_infor))
